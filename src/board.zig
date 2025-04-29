@@ -135,6 +135,8 @@ pub const Board = struct {
                 self.turn = Color.White;
             }
             try self.print();
+        } else {
+            try stdout.print("Not a valid move\n", .{});
         }
     }
 
@@ -187,7 +189,7 @@ pub const Board = struct {
         if (self.squares[move.from.@"0"][move.from.@"1"]) |piece| {
             switch (piece) {
                 Piece.WhitePawn => {
-                    if (move.from.@"0" - 1 >= 0 and self.squares[move.from.@"0" - 1][move.from.@"1"] == null) {
+                    if (@as(i16, move.from.@"0") - 1 >= 0 and self.squares[move.from.@"0" - 1][move.from.@"1"] == null) {
                         try moves_list.append(Move{
                             .from = move.from,
                             .to = .{
@@ -196,7 +198,7 @@ pub const Board = struct {
                             },
                         });
                     }
-                    if (move.from.@"0" - 1 >= 0 and move.from.@"1" - 1 >= 0 and self.check_peice_color(.{ move.from.@"0" - 1, move.from.@"1" - 1 }) == Color.Black) {
+                    if (@as(i16, move.from.@"0") - 1 >= 0 and @as(i16, move.from.@"1") - 1 >= 0 and self.check_peice_color(.{ move.from.@"0" - 1, move.from.@"1" - 1 }) == Color.Black) {
                         try moves_list.append(Move{
                             .from = move.from,
                             .to = .{
@@ -205,7 +207,7 @@ pub const Board = struct {
                             },
                         });
                     }
-                    if (move.from.@"0" - 1 >= 0 and move.from.@"1" + 1 < 8 and self.check_peice_color(.{ move.from.@"0" - 1, move.from.@"1" + 1 }) == Color.Black) {
+                    if (@as(i16, move.from.@"0" - 1) >= 0 and move.from.@"1" + 1 < 8 and self.check_peice_color(.{ move.from.@"0" - 1, move.from.@"1" + 1 }) == Color.Black) {
                         try moves_list.append(Move{
                             .from = move.from,
                             .to = .{
@@ -225,7 +227,7 @@ pub const Board = struct {
                             },
                         });
                     }
-                    if (move.from.@"0" + 1 < 8 and move.from.@"1" - 1 >= 0 and self.check_peice_color(.{ move.from.@"0" + 1, move.from.@"1" - 1 }) == Color.White) {
+                    if (move.from.@"0" + 1 < 8 and @as(i16, move.from.@"1") - 1 >= 0 and self.check_peice_color(.{ move.from.@"0" + 1, move.from.@"1" - 1 }) == Color.White) {
                         try moves_list.append(Move{
                             .from = move.from,
                             .to = .{
@@ -244,9 +246,71 @@ pub const Board = struct {
                         });
                     }
                 },
-                else => {
-                    try stdout.print("{any}\n", .{self.squares[move.from.@"0"][move.from.@"1"]});
-                    try stdout.print("Not implemented yet", .{});
+                Piece.WhiteKnight => {
+                    const offsets = [_][2]i8{ .{ -2, -1 }, .{ -2, 1 }, .{ -1, 2 }, .{ 1, 2 }, .{ 2, -1 }, .{ 2, 1 }, .{ -1, -2 }, .{ 1, -2 } };
+                    for (0..8) |i| {
+                        const x = @max(0, @as(i8, @intCast(move.from.@"0")) + offsets[i][0]);
+                        const y = @max(0, @as(i8, @intCast(move.from.@"1")) + offsets[i][1]);
+                        if (self.check_bounds(x, y) and self.check_peice_color(.{ x, y }) != Color.White) {
+                            try moves_list.append(Move{
+                                .from = move.from,
+                                .to = .{
+                                    x,
+                                    y,
+                                },
+                            });
+                        }
+                    }
+                },
+                Piece.BlackKnight => {
+                    const offsets = [_][2]i8{ .{ -2, -1 }, .{ -2, 1 }, .{ -1, 2 }, .{ 1, 2 }, .{ 2, -1 }, .{ 2, 1 }, .{ -1, -2 }, .{ 1, -2 } };
+                    for (0..8) |i| {
+                        const x = @max(0, @as(i8, @intCast(move.from.@"0")) + offsets[i][0]);
+                        const y = @max(0, @as(i8, @intCast(move.from.@"1")) + offsets[i][1]);
+                        if (self.check_bounds(x, y) and self.check_peice_color(.{ x, y }) != Color.Black) {
+                            try moves_list.append(Move{
+                                .from = move.from,
+                                .to = .{
+                                    x,
+                                    y,
+                                },
+                            });
+                        }
+                    }
+                },
+                Piece.WhiteBishop => {
+                    const offsets = [_][2]i8{ .{ -1, -1 }, .{ -1, 1 }, .{ 1, -1 }, .{ 1, 1 } };
+                    try self.sliding_piece(move, @constCast(&offsets), &moves_list, Color.Black);
+                },
+                Piece.BlackBishop => {
+                    const offsets = [_][2]i8{ .{ -1, -1 }, .{ -1, 1 }, .{ 1, -1 }, .{ 1, 1 } };
+                    try self.sliding_piece(move, @constCast(&offsets), &moves_list, Color.White);
+                },
+                Piece.WhiteRook => {
+                    const offsets = [_][2]i8{ .{ -1, 0 }, .{ 0, -1 }, .{ 1, 0 }, .{ 0, 1 } };
+                    try self.sliding_piece(move, @constCast(&offsets), &moves_list, Color.Black);
+                },
+                Piece.BlackRook => {
+                    const offsets = [_][2]i8{ .{ -1, 0 }, .{ 0, -1 }, .{ 1, 0 }, .{ 0, 1 } };
+                    try self.sliding_piece(move, @constCast(&offsets), &moves_list, Color.White);
+                },
+                Piece.WhiteQueen => {
+                    // Bishop + Rook offsets = Queen offset
+                    const offsets = [_][2]i8{ .{ -1, 0 }, .{ 0, -1 }, .{ 1, 0 }, .{ 0, 1 }, .{ -1, -1 }, .{ -1, 1 }, .{ 1, -1 }, .{ 1, 1 } };
+                    try self.sliding_piece(move, @constCast(&offsets), &moves_list, Color.Black);
+                },
+                Piece.BlackQueen => {
+                    // Bishop + Rook offsets = Queen offset
+                    const offsets = [_][2]i8{ .{ -1, 0 }, .{ 0, -1 }, .{ 1, 0 }, .{ 0, 1 }, .{ -1, -1 }, .{ -1, 1 }, .{ 1, -1 }, .{ 1, 1 } };
+                    try self.sliding_piece(move, @constCast(&offsets), &moves_list, Color.White);
+                },
+                Piece.WhiteKing => {
+                    const offsets = [_][2]i8{ .{ -1, -1 }, .{ -1, 0 }, .{ -1, 1 }, .{ 0, -1 }, .{ 0, 1 }, .{ 1, -1 }, .{ 1, 0 }, .{ 1, 1 } };
+                    try self.non_sliding_piece(move, @constCast(&offsets), &moves_list, Color.White);
+                },
+                Piece.BlackKing => {
+                    const offsets = [_][2]i8{ .{ -1, -1 }, .{ -1, 0 }, .{ -1, 1 }, .{ 0, -1 }, .{ 0, 1 }, .{ 1, -1 }, .{ 1, 0 }, .{ 1, 1 } };
+                    try self.non_sliding_piece(move, @constCast(&offsets), &moves_list, Color.Black);
                 },
             }
         } else {
@@ -255,6 +319,64 @@ pub const Board = struct {
             try stdout.print("{any}", .{self.squares[move.from.@"0"][move.from.@"1"]});
         }
         return moves_list;
+    }
+
+    fn non_sliding_piece(self: *Self, move: Move, offsets: [][2]i8, moves_list: *std.ArrayList(Move), own_color: Color) !void {
+        for (offsets) |offset| {
+            const x = @max(0, @as(i8, @intCast(move.from.@"0")) + offset[0]);
+            const y = @max(0, @as(i8, @intCast(move.from.@"1")) + offset[1]);
+            if (!self.check_bounds(x, y)) {
+                break;
+            }
+            if (self.check_peice_color(.{ @as(u8, @intCast(x)), @as(u8, @intCast(y)) }) != own_color) {
+                try moves_list.append(Move{
+                    .from = move.from,
+                    .to = .{
+                        @as(u8, @intCast(x)),
+                        @as(u8, @intCast(y)),
+                    },
+                });
+            }
+        }
+    }
+
+    fn sliding_piece(self: *Self, move: Move, offsets: [][2]i8, moves_list: *std.ArrayList(Move), enemy_color: Color) !void {
+        for (offsets) |offset| {
+            var x = @as(i8, @intCast(move.from.@"0"));
+            var y = @as(i8, @intCast(move.from.@"1"));
+            for (0..8) |_| {
+                x = @max(0, x + offset[0]);
+                y = @max(0, y + offset[1]);
+                if (!self.check_bounds(x, y)) {
+                    break;
+                }
+                if (self.check_peice_color(.{ @as(u8, @intCast(x)), @as(u8, @intCast(y)) }) == Color.None) {
+                    try moves_list.append(Move{
+                        .from = move.from,
+                        .to = .{
+                            @as(u8, @intCast(x)),
+                            @as(u8, @intCast(y)),
+                        },
+                    });
+                } else if (self.check_peice_color(.{ @as(u8, @intCast(x)), @as(u8, @intCast(y)) }) == enemy_color) {
+                    try moves_list.append(Move{
+                        .from = move.from,
+                        .to = .{
+                            @as(u8, @intCast(x)),
+                            @as(u8, @intCast(y)),
+                        },
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    fn check_bounds(_: *Self, x: i16, y: i16) bool {
+        if (x < 8 and x >= 0 and y < 8 and y >= 0) {
+            return true;
+        }
+        return false;
     }
 
     pub fn print(self: *Self) !void {
