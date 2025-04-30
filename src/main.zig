@@ -12,8 +12,11 @@ pub fn main() !void {
 }
 
 fn repl(allocator: std.mem.Allocator) !void {
-    var board = Board.init(allocator);
+    // var board = Board.init(allocator);
+    // var board = Board.fen_init(allocator, @constCast("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"));
+    var board = try Board.fen_init(allocator, @constCast("r3k2r/pp1q1ppp/2n1bn2/2bp4/2B1P3/2N2N2/PPP2PPP/R2Q1RK1 b kq e3 0 10"));
     try board.print();
+    try board.info();
 
     // try board.play(@constCast("c2c3"));
     // try board.play(@constCast("g7g6"));
@@ -43,5 +46,6 @@ fn repl(allocator: std.mem.Allocator) !void {
             std.process.exit(0);
         }
         try board.play(input);
+        try board.info();
     }
 }
