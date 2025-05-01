@@ -224,6 +224,7 @@ pub const Board = struct {
         }
         var moves = std.ArrayList(Move).init(self.allocator);
         defer moves.deinit();
+
         try self.generate_legal_moves(move.from, &moves);
         var can_move = false;
         for (moves.items) |m| {
@@ -232,6 +233,7 @@ pub const Board = struct {
                 break;
             }
         }
+
         var en_passent = false;
         if (can_move == false and (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackPawn or self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhitePawn)) {
             if (self.en_passent) |en| {
@@ -240,6 +242,14 @@ pub const Board = struct {
                     can_move = true;
                     en_passent = true;
                 }
+            }
+        }
+
+        var castle: ?u8 = null;
+        if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing or self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing) {
+            castle = self.check_castle(move);
+            if (castle) |_| {
+                can_move = true;
             }
         }
 
@@ -257,6 +267,32 @@ pub const Board = struct {
             }
 
             try self.do_move(move);
+            if (castle) |c| {
+                try self.do_castle(c);
+            }
+
+            // Unset Castling after move
+            if (self.castling) |_| {
+                if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing) {
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
+                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing) {
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "K", "");
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "Q", "");
+                }
+                if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteRook and move.from.@"0" == 7 and move.from.@"1" == 7) {
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "K", "");
+                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteRook and move.from.@"0" == 7 and move.from.@"1" == 0) {
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "Q", "");
+                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackRook and move.from.@"0" == 0 and move.from.@"1" == 7) {
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
+                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackRook and move.from.@"0" == 0 and move.from.@"1" == 0) {
+                    self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
+                }
+                if (std.mem.eql(u8, self.castling.?, "")) {
+                    self.castling = null;
+                }
+            }
 
             if (self.turn == Color.White) {
                 self.turn = Color.Black;
@@ -277,6 +313,67 @@ pub const Board = struct {
             try self.print();
         } else {
             try stdout.print("Not a valid move\n", .{});
+        }
+    }
+
+    fn check_castle(self: *Self, move: Move) ?u8 {
+        if (@abs(@as(i16, @intCast(move.from.@"1")) - move.to.@"1") > 2) {
+            return null;
+        }
+        if (self.castling) |castle| {
+            if (std.mem.containsAtLeast(u8, castle, 1, "k") and move.from.@"1" < move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" - 1] == null) {
+                return 'k';
+            } else if (std.mem.containsAtLeast(u8, castle, 1, "K") and move.from.@"1" < move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" - 1] == null) {
+                return 'K';
+            } else if (std.mem.containsAtLeast(u8, castle, 1, "q") and move.from.@"1" > move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" + 1] == null) {
+                return 'q';
+            } else if (std.mem.containsAtLeast(u8, castle, 1, "Q") and move.from.@"1" > move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" + 1] == null) {
+                return 'Q';
+            }
+        }
+        return null;
+    }
+
+    fn do_castle(self: *Self, c: u8) !void {
+        if (c == 'k') {
+            try self.do_move(.{
+                .from = .{ 0, 7 },
+                .to = .{ 0, 5 },
+            });
+            self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
+            if (std.mem.containsAtLeast(u8, self.castling.?, 1, "q")) {
+                self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
+            }
+        } else if (c == 'q') {
+            try self.do_move(.{
+                .from = .{ 0, 0 },
+                .to = .{ 0, 3 },
+            });
+            self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
+            if (std.mem.containsAtLeast(u8, self.castling.?, 1, "k")) {
+                self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
+            }
+        } else if (c == 'K') {
+            try self.do_move(.{
+                .from = .{ 7, 7 },
+                .to = .{ 7, 5 },
+            });
+            self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
+            if (std.mem.containsAtLeast(u8, self.castling.?, 1, "k")) {
+                self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
+            }
+        } else if (c == 'q') {
+            try self.do_move(.{
+                .from = .{ 7, 0 },
+                .to = .{ 7, 3 },
+            });
+            self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
+            if (std.mem.containsAtLeast(u8, self.castling.?, 1, "k")) {
+                self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
+            }
+        }
+        if (std.mem.eql(u8, self.castling.?, "")) {
+            self.castling = null;
         }
     }
 
