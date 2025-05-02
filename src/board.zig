@@ -16,13 +16,18 @@ const Piece = enum {
     BlackQueen,
 };
 
+const Position = struct {
+    row: usize,
+    col: usize,
+};
+
 const Move = struct {
     const Self = @This();
-    from: struct { u8, u8 },
-    to: struct { u8, u8 },
+    from: Position,
+    to: Position,
 
     pub fn compare(self: *const Self, move: Self) bool {
-        if (self.from.@"0" == move.from.@"0" and self.from.@"1" == move.from.@"1" and self.to.@"0" == move.to.@"0" and self.to.@"1" == move.to.@"1") {
+        if (self.from.row == move.from.row and self.from.col == move.from.col and self.to.row == move.to.row and self.to.col == move.to.col) {
             return true;
         } else {
             return false;
@@ -219,7 +224,7 @@ pub const Board = struct {
             }
         } else {
             // Modulus to prevent over and underflow
-            try stdout.print("No piece in the position {c}{}\n", .{ move.from.@"1" % 159 + 97, 8 - move.from.@"0" % 8 });
+            try stdout.print("No piece in the position {c}{}\n", .{ u8cast(move.from.col) % 159 + 97, 8 - u8cast(move.from.row) % 8 });
             return;
         }
         var moves = std.ArrayList(Move).init(self.allocator);
@@ -235,10 +240,10 @@ pub const Board = struct {
         }
 
         var en_passent = false;
-        if (can_move == false and (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackPawn or self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhitePawn)) {
+        if (can_move == false and (self.squares[move.from.row][move.from.col] == Piece.BlackPawn or self.squares[move.from.row][move.from.col] == Piece.WhitePawn)) {
             if (self.en_passent) |en| {
                 const m_ = try self.parse(@constCast(en));
-                if (m_.from.@"0" == move.to.@"0" and m_.from.@"1" == move.to.@"1") {
+                if (m_.from.row == move.to.row and m_.from.col == move.to.col) {
                     can_move = true;
                     en_passent = true;
                 }
@@ -246,7 +251,7 @@ pub const Board = struct {
         }
 
         var castle: ?u8 = null;
-        if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing or self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing) {
+        if (self.squares[move.from.row][move.from.col] == Piece.BlackKing or self.squares[move.from.row][move.from.col] == Piece.WhiteKing) {
             castle = self.check_castle(move);
             if (castle) |_| {
                 can_move = true;
@@ -260,10 +265,10 @@ pub const Board = struct {
             }
 
             // Setting en passent
-            if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhitePawn and move.from.@"0" - move.to.@"0" == 2) {
-                self.en_passent = try std.fmt.allocPrint(self.allocator, "{c}{c}", .{ 97 + move.from.@"1", 56 - move.from.@"0" + 1 });
-            } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackPawn and move.to.@"0" - move.from.@"0" == 2) {
-                self.en_passent = try std.fmt.allocPrint(self.allocator, "{c}{c}", .{ 97 + move.from.@"1", 56 - move.from.@"0" - 1 });
+            if (self.squares[move.from.row][move.from.col] == Piece.WhitePawn and move.from.row - move.to.row == 2) {
+                self.en_passent = try std.fmt.allocPrint(self.allocator, "{c}{c}", .{ 97 + u8cast(move.from.col), 56 - u8cast(move.from.row) + 1 });
+            } else if (self.squares[move.from.row][move.from.col] == Piece.BlackPawn and move.to.row - move.from.row == 2) {
+                self.en_passent = try std.fmt.allocPrint(self.allocator, "{c}{c}", .{ 97 + u8cast(move.from.col), 56 - u8cast(move.from.row) - 1 });
             }
 
             try self.do_move(move);
@@ -273,20 +278,20 @@ pub const Board = struct {
 
             // Unset Castling after move
             if (self.castling) |_| {
-                if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing) {
+                if (self.squares[move.from.row][move.from.col] == Piece.BlackKing) {
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
-                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing) {
+                } else if (self.squares[move.from.row][move.from.col] == Piece.WhiteKing) {
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "K", "");
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "Q", "");
                 }
-                if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteRook and move.from.@"0" == 7 and move.from.@"1" == 7) {
+                if (self.squares[move.from.row][move.from.col] == Piece.WhiteRook and move.from.row == 7 and move.from.col == 7) {
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "K", "");
-                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteRook and move.from.@"0" == 7 and move.from.@"1" == 0) {
+                } else if (self.squares[move.from.row][move.from.col] == Piece.WhiteRook and move.from.row == 7 and move.from.col == 0) {
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "Q", "");
-                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackRook and move.from.@"0" == 0 and move.from.@"1" == 7) {
+                } else if (self.squares[move.from.row][move.from.col] == Piece.BlackRook and move.from.row == 0 and move.from.col == 7) {
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
-                } else if (self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackRook and move.from.@"0" == 0 and move.from.@"1" == 0) {
+                } else if (self.squares[move.from.row][move.from.col] == Piece.BlackRook and move.from.row == 0 and move.from.col == 0) {
                     self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
                 }
                 if (std.mem.eql(u8, self.castling.?, "")) {
@@ -298,14 +303,14 @@ pub const Board = struct {
                 self.turn = Color.Black;
                 // Checking is move was a en passent
                 if (en_passent) {
-                    self.squares[move.to.@"0" + 1][move.to.@"1"] = null;
+                    self.squares[move.to.row + 1][move.to.col] = null;
                     en_passent = false;
                 }
             } else {
                 self.turn = Color.White;
                 // Checking is move was a en passent
                 if (en_passent) {
-                    self.squares[move.to.@"0" - 1][move.to.@"1"] = null;
+                    self.squares[move.to.row - 1][move.to.col] = null;
                     en_passent = false;
                 }
                 self.full_move_clock += 1;
@@ -317,17 +322,17 @@ pub const Board = struct {
     }
 
     fn check_castle(self: *Self, move: Move) ?u8 {
-        if (@abs(@as(i16, @intCast(move.from.@"1")) - move.to.@"1") > 2) {
+        if (diff(move.from.col, move.to.col) > 2) {
             return null;
         }
         if (self.castling) |castle| {
-            if (std.mem.containsAtLeast(u8, castle, 1, "k") and move.from.@"1" < move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" - 1] == null) {
+            if (std.mem.containsAtLeast(u8, castle, 1, "k") and move.from.col < move.to.col and self.squares[move.from.row][move.from.col] == Piece.BlackKing and self.squares[move.to.row][move.to.col] == null and self.squares[move.to.row][move.to.col - 1] == null) {
                 return 'k';
-            } else if (std.mem.containsAtLeast(u8, castle, 1, "K") and move.from.@"1" < move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" - 1] == null) {
+            } else if (std.mem.containsAtLeast(u8, castle, 1, "K") and move.from.col < move.to.col and self.squares[move.from.row][move.from.col] == Piece.WhiteKing and self.squares[move.to.row][move.to.col] == null and self.squares[move.to.row][move.to.col - 1] == null) {
                 return 'K';
-            } else if (std.mem.containsAtLeast(u8, castle, 1, "q") and move.from.@"1" > move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.BlackKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" + 1] == null) {
+            } else if (std.mem.containsAtLeast(u8, castle, 1, "q") and move.from.col > move.to.col and self.squares[move.from.row][move.from.col] == Piece.BlackKing and self.squares[move.to.row][move.to.col] == null and self.squares[move.to.row][move.to.col + 1] == null) {
                 return 'q';
-            } else if (std.mem.containsAtLeast(u8, castle, 1, "Q") and move.from.@"1" > move.to.@"1" and self.squares[move.from.@"0"][move.from.@"1"] == Piece.WhiteKing and self.squares[move.to.@"0"][move.to.@"1"] == null and self.squares[move.to.@"0"][move.to.@"1" + 1] == null) {
+            } else if (std.mem.containsAtLeast(u8, castle, 1, "Q") and move.from.col > move.to.col and self.squares[move.from.row][move.from.col] == Piece.WhiteKing and self.squares[move.to.row][move.to.col] == null and self.squares[move.to.row][move.to.col + 1] == null) {
                 return 'Q';
             }
         }
@@ -337,8 +342,14 @@ pub const Board = struct {
     fn do_castle(self: *Self, c: u8) !void {
         if (c == 'k') {
             try self.do_move(.{
-                .from = .{ 0, 7 },
-                .to = .{ 0, 5 },
+                .from = .{
+                    .row = 0,
+                    .col = 7,
+                },
+                .to = .{
+                    .row = 0,
+                    .col = 5,
+                },
             });
             self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "k", "");
             if (std.mem.containsAtLeast(u8, self.castling.?, 1, "q")) {
@@ -346,8 +357,14 @@ pub const Board = struct {
             }
         } else if (c == 'q') {
             try self.do_move(.{
-                .from = .{ 0, 0 },
-                .to = .{ 0, 3 },
+                .from = .{
+                    .row = 0,
+                    .col = 0,
+                },
+                .to = .{
+                    .row = 0,
+                    .col = 3,
+                },
             });
             self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
             if (std.mem.containsAtLeast(u8, self.castling.?, 1, "k")) {
@@ -355,8 +372,14 @@ pub const Board = struct {
             }
         } else if (c == 'K') {
             try self.do_move(.{
-                .from = .{ 7, 7 },
-                .to = .{ 7, 5 },
+                .from = .{
+                    .row = 7,
+                    .col = 7,
+                },
+                .to = .{
+                    .row = 7,
+                    .col = 5,
+                },
             });
             self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
             if (std.mem.containsAtLeast(u8, self.castling.?, 1, "k")) {
@@ -364,8 +387,14 @@ pub const Board = struct {
             }
         } else if (c == 'q') {
             try self.do_move(.{
-                .from = .{ 7, 0 },
-                .to = .{ 7, 3 },
+                .from = .{
+                    .row = 7,
+                    .col = 0,
+                },
+                .to = .{
+                    .row = 7,
+                    .col = 3,
+                },
             });
             self.castling = try std.mem.replaceOwned(u8, self.allocator, self.castling.?, "q", "");
             if (std.mem.containsAtLeast(u8, self.castling.?, 1, "k")) {
@@ -377,11 +406,11 @@ pub const Board = struct {
         }
     }
 
-    fn check_peice_color(self: *Self, from: struct { u8, u8 }) Color {
-        if (!(from.@"0" < 8 and from.@"0" >= 0 and from.@"1" < 8 and from.@"1" >= 0)) {
+    fn check_peice_color(self: *Self, from: Position) Color {
+        if (!(from.row < 8 and from.row >= 0 and from.col < 8 and from.col >= 0)) {
             return Color.None;
         }
-        if (self.squares[from.@"0"][from.@"1"]) |square| {
+        if (self.squares[from.row][from.col]) |square| {
             if (@intFromEnum(square) < 6) {
                 return Color.White;
             } else {
@@ -393,12 +422,12 @@ pub const Board = struct {
     }
 
     fn do_move(self: *Self, move: Move) !void {
-        self.squares[move.to.@"0"][move.to.@"1"] = self.squares[move.from.@"0"][move.from.@"1"];
-        self.squares[move.from.@"0"][move.from.@"1"] = null;
+        self.squares[move.to.row][move.to.col] = self.squares[move.from.row][move.from.col];
+        self.squares[move.from.row][move.from.col] = null;
     }
 
     fn parse(_: *Self, move: []u8) !Move {
-        var setting: [6]u8 = undefined;
+        var setting: [6]usize = undefined;
         var j: u8 = 0;
         for (0..move.len) |i| {
             switch (move[i]) {
@@ -411,126 +440,108 @@ pub const Board = struct {
                     j += 1;
                 },
                 else => {
-                    try stdout.print("Not done yet", .{});
+                    try stdout.print("Not a valid notation\n", .{});
                 },
             }
         }
         return Move{
-            .from = .{ setting[1], setting[0] },
-            .to = .{ setting[3], setting[2] },
+            .from = .{
+                .row = setting[1],
+                .col = setting[0],
+            },
+            .to = .{
+                .row = setting[3],
+                .col = setting[2],
+            },
         };
     }
 
-    pub fn generate_legal_moves(self: *Self, from: struct { u8, u8 }, moves_list: *std.ArrayList(Move)) !void {
-        if (self.squares[from.@"0"][from.@"1"]) |piece| {
+    fn generate_legal_moves(self: *Self, from: Position, moves_list: *std.ArrayList(Move)) !void {
+        if (self.squares[from.row][from.col]) |piece| {
             switch (piece) {
                 Piece.WhitePawn => {
-                    if (@as(i16, from.@"0") - 1 >= 0 and self.squares[from.@"0" - 1][from.@"1"] == null) {
+                    if (i8cast(from.row) - 1 >= 0 and self.squares[from.row - 1][from.col] == null) {
                         try moves_list.append(Move{
                             .from = from,
                             .to = .{
-                                from.@"0" - 1,
-                                from.@"1",
+                                .row = from.row - 1,
+                                .col = from.col,
                             },
                         });
-                        if (from.@"0" == 6 and self.squares[from.@"0" - 2][from.@"1"] == null) {
+                        if (from.row == 6 and self.squares[from.row - 2][from.col] == null) {
                             try moves_list.append(Move{
                                 .from = from,
                                 .to = .{
-                                    from.@"0" - 2,
-                                    from.@"1",
+                                    .row = from.row - 2,
+                                    .col = from.col,
                                 },
                             });
                         }
                     }
-                    if (@as(i16, from.@"0") - 1 >= 0 and @as(i16, from.@"1") - 1 >= 0 and self.check_peice_color(.{ from.@"0" - 1, from.@"1" - 1 }) == Color.Black) {
+                    if (i8cast(from.row) - 1 >= 0 and i8cast(from.col) - 1 >= 0 and self.check_peice_color(.{ .row = from.row - 1, .col = from.col - 1 }) == Color.Black) {
                         try moves_list.append(Move{
                             .from = from,
                             .to = .{
-                                from.@"0" - 1,
-                                from.@"1" - 1,
+                                .row = from.row - 1,
+                                .col = from.col - 1,
                             },
                         });
                     }
-                    if (@as(i16, from.@"0" - 1) >= 0 and from.@"1" + 1 < 8 and self.check_peice_color(.{ from.@"0" - 1, from.@"1" + 1 }) == Color.Black) {
+                    if (i8cast(from.row) - 1 >= 0 and from.col + 1 < 8 and self.check_peice_color(.{ .row = from.row - 1, .col = from.col + 1 }) == Color.Black) {
                         try moves_list.append(Move{
                             .from = from,
                             .to = .{
-                                from.@"0" - 1,
-                                from.@"1" + 1,
+                                .row = from.row - 1,
+                                .col = from.col + 1,
                             },
                         });
                     }
                 },
                 Piece.BlackPawn => {
-                    if (from.@"0" + 1 < 8 and self.squares[from.@"0" + 1][from.@"1"] == null) {
+                    if (from.row + 1 < 8 and self.squares[from.row + 1][from.col] == null) {
                         try moves_list.append(Move{
                             .from = from,
                             .to = .{
-                                from.@"0" + 1,
-                                from.@"1",
+                                .row = from.row + 1,
+                                .col = from.col,
                             },
                         });
-                        if (from.@"0" == 1 and self.squares[from.@"0" + 2][from.@"1"] == null) {
+                        if (from.row == 1 and self.squares[from.row + 2][from.col] == null) {
                             try moves_list.append(Move{
                                 .from = from,
                                 .to = .{
-                                    from.@"0" + 2,
-                                    from.@"1",
+                                    .row = from.row + 2,
+                                    .col = from.col,
                                 },
                             });
                         }
                     }
-                    if (from.@"0" + 1 < 8 and @as(i16, from.@"1") - 1 >= 0 and self.check_peice_color(.{ from.@"0" + 1, from.@"1" - 1 }) == Color.White) {
+                    if (from.row + 1 < 8 and i8cast(from.col) - 1 >= 0 and self.check_peice_color(.{ .row = from.row + 1, .col = from.col - 1 }) == Color.White) {
                         try moves_list.append(Move{
                             .from = from,
                             .to = .{
-                                from.@"0" + 1,
-                                from.@"1" - 1,
+                                .row = from.row + 1,
+                                .col = from.col - 1,
                             },
                         });
                     }
-                    if (from.@"0" + 1 < 8 and from.@"1" + 1 < 8 and self.check_peice_color(.{ from.@"0" + 1, from.@"1" + 1 }) == Color.White) {
+                    if (from.row + 1 < 8 and from.col + 1 < 8 and self.check_peice_color(.{ .row = from.row + 1, .col = from.col + 1 }) == Color.White) {
                         try moves_list.append(Move{
                             .from = from,
                             .to = .{
-                                from.@"0" + 1,
-                                from.@"1" + 1,
+                                .row = from.row + 1,
+                                .col = from.col + 1,
                             },
                         });
                     }
                 },
                 Piece.WhiteKnight => {
                     const offsets = [_][2]i8{ .{ -2, -1 }, .{ -2, 1 }, .{ -1, 2 }, .{ 1, 2 }, .{ 2, -1 }, .{ 2, 1 }, .{ -1, -2 }, .{ 1, -2 } };
-                    for (0..8) |i| {
-                        const x = @max(0, @as(i8, @intCast(from.@"0")) + offsets[i][0]);
-                        const y = @max(0, @as(i8, @intCast(from.@"1")) + offsets[i][1]);
-                        if (self.check_bounds(x, y) and self.check_peice_color(.{ x, y }) != Color.White) {
-                            try moves_list.append(Move{
-                                .from = from,
-                                .to = .{
-                                    x,
-                                    y,
-                                },
-                            });
-                        }
-                    }
+                    try self.non_sliding_piece(from, @constCast(&offsets), moves_list, Color.White);
                 },
                 Piece.BlackKnight => {
                     const offsets = [_][2]i8{ .{ -2, -1 }, .{ -2, 1 }, .{ -1, 2 }, .{ 1, 2 }, .{ 2, -1 }, .{ 2, 1 }, .{ -1, -2 }, .{ 1, -2 } };
-                    for (0..8) |i| {
-                        const x = @max(0, @as(i8, @intCast(from.@"0")) + offsets[i][0]);
-                        const y = @max(0, @as(i8, @intCast(from.@"1")) + offsets[i][1]);
-                        if (self.check_bounds(x, y) and self.check_peice_color(.{ x, y }) != Color.Black) {
-                            try moves_list.append(Move{
-                                .from = from,
-                                .to = .{
-                                    x,
-                                    y,
-                                },
-                            });
-                        }
-                    }
+                    try self.non_sliding_piece(from, @constCast(&offsets), moves_list, Color.Black);
                 },
                 Piece.WhiteBishop => {
                     const offsets = [_][2]i8{ .{ -1, -1 }, .{ -1, 1 }, .{ 1, -1 }, .{ 1, 1 } };
@@ -569,55 +580,54 @@ pub const Board = struct {
             }
         } else {
             try stdout.print("No Piece here\n", .{});
-            try stdout.print("{} {}\n", .{ from.@"0", from.@"1" });
-            try stdout.print("{any}", .{self.squares[from.@"0"][from.@"1"]});
+            try stdout.print("{} {}\n", .{ from.row, from.col });
+            try stdout.print("{any}", .{self.squares[from.row][from.col]});
         }
     }
 
-    fn non_sliding_piece(self: *Self, from: struct { u8, u8 }, offsets: [][2]i8, moves_list: *std.ArrayList(Move), own_color: Color) !void {
+    fn non_sliding_piece(self: *Self, from: Position, offsets: [][2]i8, moves_list: *std.ArrayList(Move), own_color: Color) !void {
         for (offsets) |offset| {
-            const x = @max(0, @as(i8, @intCast(from.@"0")) + offset[0]);
-            const y = @max(0, @as(i8, @intCast(from.@"1")) + offset[1]);
+            const x = i8cast(from.row) + offset[0];
+            const y = i8cast(from.col) + offset[1];
             if (!self.check_bounds(x, y)) {
                 break;
             }
-            if (self.check_peice_color(.{ @as(u8, @intCast(x)), @as(u8, @intCast(y)) }) != own_color) {
+            const pos = Position{
+                .row = @as(usize, @intCast(x)),
+                .col = @as(usize, @intCast(y)),
+            };
+            if (self.check_peice_color(pos) != own_color) {
                 try moves_list.append(Move{
                     .from = from,
-                    .to = .{
-                        @as(u8, @intCast(x)),
-                        @as(u8, @intCast(y)),
-                    },
+                    .to = pos,
                 });
             }
         }
     }
 
-    fn sliding_piece(self: *Self, from: struct { u8, u8 }, offsets: [][2]i8, moves_list: *std.ArrayList(Move), enemy_color: Color) !void {
+    fn sliding_piece(self: *Self, from: Position, offsets: [][2]i8, moves_list: *std.ArrayList(Move), enemy_color: Color) !void {
         for (offsets) |offset| {
-            var x = @as(i8, @intCast(from.@"0"));
-            var y = @as(i8, @intCast(from.@"1"));
+            var x = i8cast(from.row);
+            var y = i8cast(from.col);
             for (0..8) |_| {
-                x = @max(0, x + offset[0]);
-                y = @max(0, y + offset[1]);
+                x = x + offset[0];
+                y = y + offset[1];
                 if (!self.check_bounds(x, y)) {
                     break;
                 }
-                if (self.check_peice_color(.{ @as(u8, @intCast(x)), @as(u8, @intCast(y)) }) == Color.None) {
+                const pos = Position{
+                    .row = @as(usize, @intCast(x)),
+                    .col = @as(usize, @intCast(y)),
+                };
+                if (self.check_peice_color(pos) == Color.None) {
                     try moves_list.append(Move{
                         .from = from,
-                        .to = .{
-                            @as(u8, @intCast(x)),
-                            @as(u8, @intCast(y)),
-                        },
+                        .to = pos,
                     });
-                } else if (self.check_peice_color(.{ @as(u8, @intCast(x)), @as(u8, @intCast(y)) }) == enemy_color) {
+                } else if (self.check_peice_color(pos) == enemy_color) {
                     try moves_list.append(Move{
                         .from = from,
-                        .to = .{
-                            @as(u8, @intCast(x)),
-                            @as(u8, @intCast(y)),
-                        },
+                        .to = pos,
                     });
                     break;
                 }
@@ -650,3 +660,19 @@ pub const Board = struct {
         try stdout.print("  A B C D E F G H\n", .{});
     }
 };
+
+fn diff(x: usize, y: usize) usize {
+    if (x > y) {
+        return x - y;
+    } else {
+        return y - x;
+    }
+}
+
+fn i8cast(x: usize) i8 {
+    return @as(i8, @intCast(x));
+}
+
+fn u8cast(x: usize) u8 {
+    return @as(u8, @intCast(x));
+}
