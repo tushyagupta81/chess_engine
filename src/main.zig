@@ -45,7 +45,7 @@ fn repl(allocator: std.mem.Allocator) !void {
             try stdout.print("Thank you for playing\n", .{});
             std.process.exit(0);
         }
-        try board.play(input);
+        try board.play(input, false);
         try board.info();
     }
 }

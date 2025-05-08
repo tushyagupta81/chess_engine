@@ -118,6 +118,18 @@ pub const Board = struct {
         };
     }
 
+    fn clone(self: *Self) Self {
+        return Self{
+            .squares = self.squares,
+            .allocator = self.allocator,
+            .turn = self.turn,
+            .castling = self.castling,
+            .en_passent = self.en_passent,
+            .half_move_clock = self.half_move_clock,
+            .full_move_clock = self.full_move_clock,
+        };
+    }
+
     pub fn fen_init(allocator: std.mem.Allocator, fen: []u8) !Self {
         var squares: [8][8]?Piece = undefined;
         var pieces_pointer = std.mem.splitAny(u8, fen, " ");
@@ -214,7 +226,7 @@ pub const Board = struct {
         try stdout.print("Full Move Clock = {d}\n", .{self.full_move_clock});
     }
 
-    pub fn play(self: *Self, s: []u8) !void {
+    pub fn play(self: *Self, s: []u8, copy: bool) !void {
         const move = try self.parse(s);
         const color = self.check_peice_color(move.from);
         if (color != Color.None) {
@@ -258,7 +270,9 @@ pub const Board = struct {
             }
         }
 
-        if (can_move) {
+        if (!copy and try self.is_in_check(s)) {
+            try stdout.print("You are in check, not a valid move\n", .{});
+        } else if (can_move) {
             // Unset the en_passent
             if (self.en_passent) |_| {
                 self.en_passent = null;
@@ -315,10 +329,13 @@ pub const Board = struct {
                 }
                 self.full_move_clock += 1;
             }
-            try self.print();
+            if (!copy) {
+                try self.print();
+            }
         } else {
             try stdout.print("Not a valid move\n", .{});
         }
+        try stdout.print("\n", .{});
     }
 
     fn check_castle(self: *Self, move: Move) ?u8 {
@@ -337,6 +354,52 @@ pub const Board = struct {
             }
         }
         return null;
+    }
+
+    fn is_in_check(self: *Self, move: []u8) anyerror!bool {
+        var copy = self.clone();
+        try copy.play(move, true);
+
+        var moves_list = std.ArrayList(Move).init(self.allocator);
+        defer moves_list.deinit();
+
+        var king: Position = undefined;
+        for (0..8) |i| {
+            for (0..8) |j| {
+                const from = Position{ .row = i, .col = j };
+                if (copy.turn == Color.Black) {
+                    if (copy.check_peice_color(from) == Color.Black) {
+                        try copy.generate_legal_moves(from, &moves_list);
+                    }
+                    if (copy.squares[i][j]) |p| {
+                        if (p == Piece.WhiteKing) {
+                            king = .{
+                                .row = i,
+                                .col = j,
+                            };
+                        }
+                    }
+                } else {
+                    if (copy.check_peice_color(.{ .row = i, .col = j }) == Color.White) {
+                        try copy.generate_legal_moves(from, &moves_list);
+                    }
+                    if (copy.squares[i][j]) |p| {
+                        if (p == Piece.BlackKing) {
+                            king = .{
+                                .row = i,
+                                .col = j,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        for (moves_list.items) |m| {
+            if (m.to.row == king.row and m.to.col == king.col) {
+                return true;
+            }
+        }
+        return false;
     }
 
     fn do_castle(self: *Self, c: u8) !void {
@@ -590,7 +653,7 @@ pub const Board = struct {
             const x = i8cast(from.row) + offset[0];
             const y = i8cast(from.col) + offset[1];
             if (!self.check_bounds(x, y)) {
-                break;
+                continue;
             }
             const pos = Position{
                 .row = @as(usize, @intCast(x)),
