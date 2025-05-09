@@ -239,12 +239,20 @@ pub const Board = struct {
             try stdout.print("No piece in the position {c}{}\n", .{ u8cast(move.from.col) % 159 + 97, 8 - u8cast(move.from.row) % 8 });
             return;
         }
-        var moves = std.ArrayList(Move).init(self.allocator);
-        defer moves.deinit();
+        var moves_list = std.ArrayList(Move).init(self.allocator);
+        defer moves_list.deinit();
 
-        try self.generate_legal_moves(move.from, &moves);
+        for (0..8) |i| {
+            for (0..8) |j| {
+                if (self.squares[i][j]) |_| {
+                    const from = Position{ .row = i, .col = j };
+                    try self.generate_legal_moves(from, &moves_list);
+                }
+            }
+        }
+
         var can_move = false;
-        for (moves.items) |m| {
+        for (moves_list.items) |m| {
             if (move.compare(m)) {
                 can_move = true;
                 break;

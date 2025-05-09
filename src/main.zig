@@ -14,7 +14,9 @@ pub fn main() !void {
 fn repl(allocator: std.mem.Allocator) !void {
     // var board = Board.init(allocator);
     // var board = Board.fen_init(allocator, @constCast("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"));
-    var board = try Board.fen_init(allocator, @constCast("r3k2r/pp1q1ppp/2n1bn2/2bp4/2B1P3/2N2N2/PPP2PPP/R2Q1RK1 b kq e3 0 10"));
+    // var board = try Board.fen_init(allocator, @constCast("r3k2r/pp1q1ppp/2n1bn2/2bp4/2B1P3/2N2N2/PPP2PPP/R2Q1RK1 b kq e3 0 10"));
+    var board = try Board.fen_init(allocator, @constCast("6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1"));
+
     try board.print();
     try board.info();
 
